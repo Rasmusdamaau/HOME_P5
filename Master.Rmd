@@ -5,6 +5,165 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DT)
+library(GGally)
+library(caret) # for cross validation
+library(readr)
+library(dataMaid)
+library(corrplot)
 ```
+
+```{r "data import", include=FALSE}
+
+load("C:/Users/rasmu/OneDrive - Aalborg Universitet/0P5/R-projekt-p5/HOME dataset updated/HOME_med_koordinater.Rda")
+#Tænker at man kan nøjes med at inkludere kode og plots ved brug af \includepdf i overleaf, altså ved at slette den smule lim tekst jeg skriver mellem code chunks og så knitte til pdf. Eller bare kopiere relevante chunks ind i andet dokument for at knitte.
+```
+
+Firstly dataMaid is used to get a generel feel for the data, this will not be included in the project as it is too large.
+
+```{r "data report dataMaid", eval=FALSE, include=FALSE}
+# makeDataReport(HOME)
+```
+
+From the data report a number of issues are noticed with the classes of the parameters, such as parameters which should be integers and so on. Aswell as parameters with a lot of missing values.
+
+```{r "fixing parameter classes"}
+#select only "ejerlejligheder" in "Aalborg" and remove parameters with too many NA's, and removing rows with NA's
+
+EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
+  filter(Postnr == 9000) %>% select(-c(NytKokken, NyeVinduer, NytBadevaerelse, AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+
+
+EL_HOME$OmbygningSket <- factor(EL_HOME$OmbygningSket)
+EL_HOME$Hoejhus <- factor(EL_HOME$Hoejhus)
+EL_HOME$Storgrund <- factor(EL_HOME$Storgrund)
+EL_HOME$Kaelder <- factor(EL_HOME$Kaelder)
+EL_HOME$MangeToil <- factor(EL_HOME$MangeToil)
+EL_HOME$Salgsaar <- as.integer(EL_HOME$Salgsaar)
+EL_HOME$GarageCarport <- factor(EL_HOME$GarageCarport)
+EL_HOME$Altan <- factor(EL_HOME$Altan)
+EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
+EL_HOME$AntalPlan <- factor(EL_HOME$AntalPlan)
+EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
+EL_HOME$EjdType <- factor(EL_HOME$EjdType)
+EL_HOME$Liggetid <- as.integer(EL_HOME$Liggetid)
+
+
+```
+
+Now the distribution of "Kontant pris" is checked, which should be normal for a GLM
+
+```{r "check normal distribution"}
+
+qqnorm(EL_HOME$Kontantpris)
+qqline(EL_HOME$Kontantpris)
+
+# A logarithmic transformation is tried
+qqnorm(log(EL_HOME$Kontantpris))
+qqline(log(EL_HOME$Kontantpris))
+
+ggplot(EL_HOME, aes(log(Kontantpris))) +
+  geom_density(size = 1.2)
+
+ggplot(EL_HOME, aes((Kontantpris))) +
+  geom_density(size = 1.2)
+
+```
+
+Parameter for season.
+
+```{r "parameters for season and floor"}
+# Gathering quarter parameters to one
+EL_HOME$Season <- EL_HOME$Kvartal1 + EL_HOME$Kvartal2 * 2 + EL_HOME$Kvartal3 * 3 + 
+  EL_HOME$Kvartal4 *4
+EL_HOME$Season <- factor(EL_HOME$Season)
+
+```
+
+Firstly a model with all relevant parameters is tried
+
+```{r "initial models"}
+
+
+mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Season, data = EL_HOME)
+summary(mod1)
+
+# attempt at removal of insignificant parameters
+# season, liggetid
+mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
+             OmbygningSket + Opfoerelsesaar + Salgsaar + Alder, data = EL_HOME)
+summary(mod2)
+anova(mod1,mod2)
+# the p-value is above 0.05 so the two parameters can safely be removed
+
+```
+
+It seems from the summary of mod2 that no other paramters are insignificant.
+
+```{r "residual plots for chosen model"}
+
+res <- rstudent(mod2)
+pred <- predict(mod2)
+
+ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
+  geom_point() +
+  theme_bw()
+
+ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
+  geom_point() +
+  theme_bw()
+
+hat <- data.frame(hatvalues(mod2))
+
+ggplot(hat, aes(hat$hatvalues.mod2.)) +
+  geom_histogram() +
+  theme_bw()
+
+hat_Large <- which(hat$hatvalues.mod2.> 0.1)
+
+EL_HOME <- EL_HOME[-hat_Large,] # after this repeat chunk "initial models" until no more outliers
+
+summary(EL_HOME$Boligtilstand)
+EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
+```
+
+
+Cross validation K fold
+
+```{r "cross validation k fold"}
+
+train.control <- trainControl(method = "repeatedcv", 
+                              number = 5, repeats = 10)
+# Train the model
+model <- train(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
+                 OmbygningSket + Opfoerelsesaar + Salgsaar + Alder, data = EL_HOME, method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+
+
+model$finalModel
+mod2$coefficients
+model$results
+
+```
+
+cross validation leave on out
+
+```{r }
+
+
+
+
+```
+
+
+
+
+
+
+
 
 
