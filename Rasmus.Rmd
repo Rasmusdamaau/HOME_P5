@@ -9,6 +9,7 @@ library(tidyverse)
 library(DT)
 library(GGally)
 library(caret) # for cross validation
+library(readr)
 ```
 
 
@@ -43,7 +44,26 @@ HOME$Saeson <- factor(HOME$Saeson)
 
 EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
    filter(Postnr == 9000) %>% 
-  na.omit()
+  na.omit
+
+EL_HOME$OmbygningSket <- factor(EL_HOME$OmbygningSket)
+EL_HOME$Hoejhus <- factor(EL_HOME$Hoejhus)
+EL_HOME$Storgrund <- factor(EL_HOME$Storgrund)
+EL_HOME$Kaelder <- factor(EL_HOME$Kaelder)
+EL_HOME$MangeToil <- factor(EL_HOME$MangeToil)
+EL_HOME$Salgsaar <- as.integer(EL_HOME$Salgsaar)
+EL_HOME$GarageCarport <- factor(EL_HOME$GarageCarport)
+EL_HOME$Altan <- factor(EL_HOME$Altan)
+EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
+EL_HOME$AntalPlan <- factor(EL_HOME$AntalPlan)
+EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
+EL_HOME$EjdType <- factor(EL_HOME$EjdType)
+EL_HOME$Liggetid <- as.integer(EL_HOME$Liggetid)
+
+adresser_aalborg <- read_csv("adresser_aalborg")
+etage <- as.numeric(unlist(adresser_aalborg))
+etage <- factor(etage)
+EL_HOME$Etage <- etage
 
 qqnorm(EL_HOME$Kontantpris)
 qqline(EL_HOME$Kontantpris)
@@ -52,8 +72,13 @@ qqline(log(EL_HOME$Kontantpris))
 
 
 
-mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan + OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Saeson, data = EL_HOME)
+mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan + OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Saeson + Etage, data = EL_HOME)
 summary(mod1)
+mod0 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan + OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Saeson, data = EL_HOME)
+anova(mod1,mod0)
+
+
+
 mod0 <- lm(log(Kontantpris) ~ Boligareal + Altan + OmbygningSket + Opfoerelsesaar + Salgsaar, data = EL_HOME)
 summary(mod0)
 anova(mod0,mod1)
@@ -417,20 +442,20 @@ model <- train(Fertility ~., data = swiss, method = "lm",
 print(model)
 
 train.control <- trainControl(method = "repeatedcv", 
-                              number = 1329, repeats = 1)
+                              number = 5, repeats = 10)
 # Train the model
-model <- train(log(Kontantpris) ~ Boligareal  + Altan + Opfoerelsesaar + Salgsaar, data = EL_HOME, method = "lm",
+model <- train(log(Kontantpris) ~Boligtilstand +Boligareal + AntalToiletter + Altan + OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Saeson + Etage, data = EL_HOME, method = "lm",
                trControl = train.control)
 # Summarize the results
 print(model)
+model$finalModel
 ```
 
 
 
 ```{r}
 adresse <- as.data.frame(EL_HOME$FuldAdresse)
-write_csv(adresse, ",")
-
+write_csv(adresse, "adresser_aalborg")
 
 
 
