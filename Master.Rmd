@@ -29,10 +29,13 @@ Firstly dataMaid is used to get a generel feel for the data, this will not be in
 From the data report a number of issues are noticed with the classes of the parameters, such as parameters which should be integers and so on. Aswell as parameters with a lot of missing values.
 
 ```{r "fixing parameter classes"}
-#select only "ejerlejligheder" in "Aalborg" and remove parameters with too many NA's, and removing rows with NA's
+# select only "ejerlejligheder" in "Aalborg" and
+# remove parameters with too many NA's, and removing rows with NA's
 
 EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
-  filter(Postnr == 9000) %>% select(-c(NytKokken, NyeVinduer, NytBadevaerelse, AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+  filter(Postnr == 9000) %>% 
+  select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
+            AntalSovevaerelser, TaetVedVand)) %>% na.omit()
 
 
 EL_HOME$OmbygningSket <- factor(EL_HOME$OmbygningSket)
@@ -64,28 +67,41 @@ qqnorm(log(EL_HOME$Kontantpris))
 qqline(log(EL_HOME$Kontantpris))
 
 ggplot(EL_HOME, aes(log(Kontantpris))) +
-  geom_density(size = 1.2)
+  geom_density(size = 1.2) +
+  theme_bw()
 
 ggplot(EL_HOME, aes((Kontantpris))) +
-  geom_density(size = 1.2)
+  geom_density(size = 1.2) +
+  theme_bw()
 
 ```
 
-#Parameter for season.
+# Parameter for season.
 
-```{r "parameters for season"}
+Also removing parameters irrelevant for condoes
+
+```{r "parameter for season"}
 # Gathering quarter parameters to one
 EL_HOME$Season <- EL_HOME$Kvartal1 + EL_HOME$Kvartal2 * 2 + EL_HOME$Kvartal3 * 3 + 
   EL_HOME$Kvartal4 *4
 EL_HOME$Season <- factor(EL_HOME$Season)
 
+# removing Kvartal parameters, and also 
+EL_HOME <- EL_HOME %>% select(-c(Kvartal1, Kvartal2, Kvartal3, Kvartal4,
+                                 GarageCarport, x, y, long, lat, Hoejhus,
+                                 Storgrund, Kaelder, Kaelderareal, Grundareal))
+
 ```
 
-#Firstly a model with all relevant parameters is tried. For example Alder is removed because it isn't linearly independent of Opfoerelsesaar and Salgsaar.
+# Generel Linear model
+
+Firstly a model with all relevant parameters is tried. For example Alder is removed because it isn't linearly independent of Opfoerelsesaar and Salgsaar.
 
 ```{r "initial model"}
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season +
+             AntalPlan, 
+           data = EL_HOME)
 summary(mod1)
 ```
 
@@ -123,55 +139,50 @@ EL_HOME <- EL_HOME[-hat_large,]
 
 # Some factor parameters might have changed
 summary(EL_HOME$Boligtilstand)
+# Factor with only 1 entry is removed
+EL_HOME <- EL_HOME[-which(EL_HOME$Boligtilstand == "Daarlig"),]
 EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
 summary(EL_HOME$AntalToiletter)
 EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
+summary(EL_HOME$AntalPlan)
+EL_HOME <- EL_HOME[-which(EL_HOME$AntalPlan == 7),]
+EL_HOME$AntalPlan <- factor(EL_HOME$AntalPlan)
+
 ```
 
-#Reducing parameters
+# Reducing parameters
 
 
 ```{r "reducing parameters"}
-
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season +
+             AntalPlan, data = EL_HOME)
 summary(mod1)
 
 # attempt at removal of insignificant parameters:
 # Season, Liggetid, Antal toiletter
 mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-             OmbygningSket + Opfoerelsesaar + Salgsaar, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Salgsaar + AntalPlan, data = EL_HOME)
 summary(mod2)
 anova(mod1,mod2)
 # the p-value is above 0.05 so the parameters can safely be removed
 
-mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + OmbygningSket + Boligtilstand +
-             Salgsaar, data = EL_HOME)
+# attempt at removal of insignificant parameters:
+# OmbygningSket
+mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstand +
+             Salgsaar + AntalPlan, data = EL_HOME)
 summary(mod3)
 anova(mod2,mod3)
-
-mod4 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar, data = EL_HOME)
-summary(mod4)
-anova(mod3,mod4)
-
-mod5 <- lm(log(Kontantpris) ~ Boligareal + Altan +
-             Salgsaar, data = EL_HOME)
-anova(mod4,mod5)
-# mod4 it the most we can reduce the model
-
-mod6 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Alder + Salgsaar, data = EL_HOME)
-summary(mod6)
-anova(mod6,mod4)
-
+# the p-value says that Opfoerelsesaar can safely be removed
+# mod3 seems to be the best model
 ```
 
-It seems from the summary of mod2 that no other paramters are insignificant.
 
-```{r "residual plots for chosen model"}
-res <- rstudent(mod2)
-pred <- predict(mod2)
+# Check mod3
+
+```{r "residual and leverage check of mod6"}
+res <- rstudent(mod3)
+pred <- predict(mod3)
 
 ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
   geom_point() +
@@ -181,170 +192,53 @@ ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
   geom_point() +
   theme_bw()
 
-hat <- data.frame(hatvalues(mod2))
+hat <- data.frame(hatvalues(mod3))
 
-ggplot(hat, aes(hat$hatvalues.mod2.)) +
+ggplot(hat, aes(hat$hatvalues.mod3.)) +
   geom_histogram() +
   theme_bw()
 
-hat_large <- which(hat > 0.2)
-EL_HOME[hat_large,]
 
 ```
 
 
-```{r "residual plots for chosen model"}
-hat_Large <- which(hat$hatvalues.mod2.> 0.1)
-
-EL_HOME[hat_Large,]
-EL_HOME <- EL_HOME[-hat_Large,] # after this repeat chunk "initial models" until no more outliers
-
-# if one of the factor categories are empty then it has to be refactorized, then the models have to be repeated
-summary(EL_HOME$Boligtilstand)
-EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
-summary(EL_HOME$AntalToiletter)
-EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
-```
-
-# Repeating models
-
-```{r "repeating models"}
-
-mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Season, data = EL_HOME)
-summary(mod1)
-
-# attempt at removal of insignificant parameters
-# season, liggetid
-mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-             OmbygningSket + Opfoerelsesaar + Salgsaar + Alder + AntalToiletter, data = EL_HOME)
-summary(mod2)
-anova(mod1,mod2)
-# the p-value is above 0.05 so the two parameters can safely be removed
-
-
-```
-
-# Repeating check for outliers
-
-```{r "repeating check for outliers"}
-
-res <- rstudent(mod2)
-pred <- predict(mod2)
-
-ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
-  geom_point() +
-  theme_bw()
-
-ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
-  geom_point() +
-  theme_bw()
-
-hat <- data.frame(hatvalues(mod2))
-
-ggplot(hat, aes(hat$hatvalues.mod2.)) +
-  geom_histogram() +
-  theme_bw()
-
-hat_Large <- which(hat$hatvalues.mod2.> 0.1)
-
-EL_HOME[hat_Large,]
-EL_HOME <- EL_HOME[-hat_Large,] # after this repeat chunk "initial models" until no more outliers
-
-# if one of the factor categories are empty then it has to be refactorized, then the models have to be repeated
-summary(EL_HOME$Boligtilstand)
-EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
-summary(EL_HOME$AntalToiletter)
-EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
-# the 2 condoes with 3 toilets are outliers so now the model process is repeated again
-```
-
-#Repeat model again
-
-```{r "repeat model round 2"}
-
-mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Alder + Season, data = EL_HOME)
-summary(mod1)
-
-# attempt at removal of insignificant parameters
-# season, liggetid, antal toiletter(since we just removed the 2 cases of 3 toilets)
-mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-             OmbygningSket + Opfoerelsesaar + Salgsaar + Alder, data = EL_HOME)
-summary(mod2)
-anova(mod1,mod2)
-# the p-value is above 0.05 so the two parameters can safely be removed
-
-
-```
-
-#Check for outliers again
-
-```{r "check for outliers round 2"}
-
-res <- rstudent(mod2)
-pred <- predict(mod2)
-
-ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
-  geom_point() +
-  theme_bw()
-
-ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
-  geom_point() +
-  theme_bw()
-
-pred_large <- which(pred > 16)
-EL_HOME[pred_large,]
-
-hat <- data.frame(hatvalues(mod2))
-ggplot(hat, aes(hat$hatvalues.mod2.)) +
-  geom_histogram() +
-  theme_bw()
-
-hat_Large <- which(hat$hatvalues.mod2.> 0.04)
-
-EL_HOME[hat_Large,]
-# no outliers are detected
-
-
-```
-
-
-#Cross validation K fold
+# Cross validation K fold
 
 ```{r "cross validation k fold"}
 
 train.control <- trainControl(method = "repeatedcv", 
                               number = 5, repeats = 10)
 # Train the model
-model <- train(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-                 OmbygningSket + Opfoerelsesaar + Salgsaar + Alder, data = EL_HOME, method = "lm",
+model <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
+                 Boligtilstand + Salgsaar + AntalPlan, 
+               data = EL_HOME, method = "lm",
                trControl = train.control)
 # Summarize the results
 # print(model)
 
 
 model$finalModel
-mod2$coefficients
+mod3$coefficients
 model$results
 
 ```
 
-#Cross validation leave one out
+# Cross validation leave one out
 
 ```{r "cross validation leave one out"}
 
 # Define training control
 train.control <- trainControl(method = "LOOCV")
 # Train the model
-model_loocv <- train(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-                 OmbygningSket + Opfoerelsesaar + Salgsaar + Alder, data = EL_HOME, method = "lm",
-               trControl = train.control)
+model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
+                       Boligtilstand + Salgsaar + AntalPlan,
+                     data = EL_HOME, method = "lm",
+                     trControl = train.control)
 # Summarize the results
 print(model_loocv)
 
 model_loocv$finalModel
-mod2$coefficients
+mod3$coefficients
 
 ```
 
