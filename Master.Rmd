@@ -1,6 +1,7 @@
 ---
 title: "Master"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -17,7 +18,6 @@ library(corrplot)
 ```
 
 ```{r "data import", include=FALSE}
-
 load("C:/Users/rasmu/OneDrive - Aalborg Universitet/0P5/R-projekt-p5/HOME dataset updated/HOME_med_koordinater.Rda")
 #Tænker at man kan nøjes med at inkludere kode og plots ved brug af \includepdf i overleaf, altså ved at slette den smule lim tekst jeg skriver mellem code chunks og så knitte til pdf. Eller bare kopiere relevante chunks ind i andet dokument for at knitte.
 ```
@@ -88,10 +88,12 @@ EL_HOME$Season <- EL_HOME$Kvartal1 + EL_HOME$Kvartal2 * 2 + EL_HOME$Kvartal3 * 3
   EL_HOME$Kvartal4 *4
 EL_HOME$Season <- factor(EL_HOME$Season)
 
-# removing Kvartal parameters, and also 
+# removing Kvartal parameters, and also other irrelevant parameters for our subset
+# of the data
 EL_HOME <- EL_HOME %>% select(-c(Kvartal1, Kvartal2, Kvartal3, Kvartal4,
                                  GarageCarport, x, y, long, lat, Hoejhus,
-                                 Storgrund, Kaelder, Kaelderareal, Grundareal))
+                                 Storgrund, Kaelder, Kaelderareal, Grundareal,
+                                 AntalPlan))
 
 ```
 
@@ -101,8 +103,7 @@ Firstly a model with all relevant parameters is tried. For example Alder is remo
 
 ```{r "initial model"}
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season +
-             AntalPlan, 
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
            data = EL_HOME)
 summary(mod1)
 ```
@@ -110,7 +111,7 @@ summary(mod1)
 We will now check for outliers as a result of mistakes in the data.
 
 
-```{r "residuals and leverage"}
+```{r "residuals and leverage", warning=FALSE}
 
 res <- rstudent(mod1)
 pred <- predict(mod1)
@@ -146,25 +147,22 @@ EL_HOME <- EL_HOME[-which(EL_HOME$Boligtilstand == "Daarlig"),]
 EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
 summary(EL_HOME$AntalToiletter)
 EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
-summary(EL_HOME$AntalPlan)
-EL_HOME <- EL_HOME[-which(EL_HOME$AntalPlan == 7),]
-EL_HOME$AntalPlan <- factor(EL_HOME$AntalPlan)
 
 ```
 
 # Reducing parameters
 
 
-```{r "reducing parameters"}
+```{r "reducing parameters", warning=FALSE}
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season +
-             AntalPlan, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
+             data = EL_HOME)
 summary(mod1)
 
 # attempt at removal of insignificant parameters:
 # Season, Liggetid, Antal toiletter
 mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-             OmbygningSket + Opfoerelsesaar + Salgsaar + AntalPlan, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Salgsaar, data = EL_HOME)
 summary(mod2)
 anova(mod1,mod2)
 # the p-value is above 0.05 so the parameters can safely be removed
@@ -172,21 +170,39 @@ anova(mod1,mod2)
 # attempt at removal of insignificant parameters:
 # OmbygningSket
 mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstand +
-             Salgsaar + AntalPlan, data = EL_HOME)
+             Salgsaar, data = EL_HOME)
 summary(mod3)
 anova(mod2,mod3)
+# the p-value says that OmbygningSket can safely be removed
+
+# attempt at removal of insignificant parameters:
+# Opfoerelsesaar
+mod4 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar, data = EL_HOME)
+summary(mod4)
+anova(mod3,mod4)
 # the p-value says that Opfoerelsesaar can safely be removed
-# mod3 seems to be the best model
+# now only Salgsaar is a parameter so Alder can be added without 
+# causing linear dependency
+
+mod5 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder, data = EL_HOME)
+summary(mod5)
+anova(mod4,mod5)
+# the p-value shows that Alder can not be removed
+
+# the model can not be reduced to less than mod5
+
 ```
 
 
-# Check mod3
+# Check mod5
 
-```{r "residual and leverage check of mod3"}
-res <- rstudent(mod3)
-pred <- predict(mod3)
+```{r "residual and leverage check of mod5"}
+res <- rstudent(mod5)
+pred <- predict(mod5)
 
-ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
+ggplot(cbind(EL_HOME, res, pred), aes(log(Kontantpris), res)) +
   geom_point() +
   theme_bw()
 
@@ -194,9 +210,9 @@ ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
   geom_point() +
   theme_bw()
 
-hat <- data.frame(hatvalues(mod3))
+hat <- data.frame(hatvalues(mod5))
 
-ggplot(hat, aes(hat$hatvalues.mod3.)) +
+ggplot(hat, aes(hat$hatvalues.mod5.)) +
   geom_histogram() +
   theme_bw()
 
@@ -211,8 +227,8 @@ ggplot(hat, aes(hat$hatvalues.mod3.)) +
 train.control <- trainControl(method = "repeatedcv", 
                               number = 5, repeats = 10)
 # Train the model
-model <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
-                 Boligtilstand + Salgsaar + AntalPlan, 
+model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder, 
                data = EL_HOME, method = "lm",
                trControl = train.control)
 # Summarize the results
@@ -220,7 +236,7 @@ model <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
 
 
 model$finalModel
-mod3$coefficients
+mod5$coefficients
 model$results
 
 ```
@@ -232,20 +248,60 @@ model$results
 # Define training control
 train.control <- trainControl(method = "LOOCV")
 # Train the model
-model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
-                       Boligtilstand + Salgsaar + AntalPlan,
+model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder,
                      data = EL_HOME, method = "lm",
                      trControl = train.control)
 # Summarize the results
 # print(model_loocv)
 
 model_loocv$finalModel
-mod3$coefficients
+mod5$coefficients
 model_loocv$results
 
 ```
 
 
+```{r}
+lower <- 0.75 * EL_HOME$Kontantpris
+upper <- 1.25 * EL_HOME$Kontantpris
+sum(exp(pred) < upper & exp(pred) > lower)
+
+ordered_data <- EL_HOME[order(EL_HOME$Kontantpris),]
+
+yc <- predict(mod5, ordered_data, interval = "confidence")
+ypi <- predict(mod5, ordered_data, interval = "prediction")
+
+
+
+```
+
+
+
+<!-- ```{r} -->
+
+
+<!-- plot_data <- data.frame(x = seq_along(EL_HOME$Kontantpris), p = exp(pred), k = -->
+<!--                           EL_HOME$Kontantpris) -->
+
+<!-- ggplot(plot_data, aes(x, k)) + -->
+<!--   geom_point(color = "red") + -->
+<!--   geom_point(aes(x, p), color = "blue") + -->
+<!--   theme_bw() + -->
+<!--   xlab("Index") + -->
+<!--   ylab("Pris") -->
+
+
+<!-- resid_plot <- data.frame(res = EL_HOME$Kontantpris - exp(pred), index = -->
+<!--                            seq_along(residuals(mod3))) -->
+
+<!-- ggplot(resid_plot, aes(index, res)) + -->
+<!--   geom_point() -->
+
+<!-- summary((residuals(mod3))) -->
+<!-- summary(EL_HOME$Kontantpris - exp(pred)) -->
+
+<!-- ``` -->
 
 
 
