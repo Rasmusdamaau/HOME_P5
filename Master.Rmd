@@ -1,6 +1,8 @@
 ---
 title: "Master"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -180,7 +182,7 @@ anova(mod2,mod3)
 
 # Check mod3
 
-```{r "residual and leverage check of mod6"}
+```{r "residual and leverage check of mod3"}
 res <- rstudent(mod3)
 pred <- predict(mod3)
 
@@ -235,13 +237,13 @@ model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar +
                      data = EL_HOME, method = "lm",
                      trControl = train.control)
 # Summarize the results
-print(model_loocv)
+# print(model_loocv)
 
 model_loocv$finalModel
 mod3$coefficients
+model_loocv$results
 
 ```
-
 
 
 
