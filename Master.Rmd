@@ -263,45 +263,34 @@ model_loocv$results
 
 
 ```{r}
-lower <- 0.75 * EL_HOME$Kontantpris
-upper <- 1.25 * EL_HOME$Kontantpris
-sum(exp(pred) < upper & exp(pred) > lower)
+ordered_data <- arrange(EL_HOME, Kontantpris)
 
-ordered_data <- EL_HOME[order(EL_HOME$Kontantpris),]
+yc <- as.data.frame(apply(predict(mod5, ordered_data, interval = "confidence"), 2, exp))
+names(yc) <- c("pred", "lower_conf", "upper_conf")
+ypi <- as.data.frame(apply(predict(mod5, ordered_data, interval = "prediction"),2,exp)) %>% 
+  select(-fit)
+names(ypi) <- c("lower_pred", "upper_pred")
 
-yc <- predict(mod5, ordered_data, interval = "confidence")
-ypi <- predict(mod5, ordered_data, interval = "prediction")
+plot_data <- bind_cols(ordered_data, yc, ypi, index = seq_along(EL_HOME$Kontantpris))
 
+subset <- seq(1, length(EL_HOME$Kontantpris), length.out = 100)
+plot_data[subset,]
 
+ggplot(plot_data[,], aes(index, Kontantpris)) +
+  geom_point() +
+  # geom_point(aes(index, pred), color = "blue") +
+  # geom_point(aes(index, lower_conf), color = "red") +
+  # geom_point(aes(index, upper_conf), color = "red") +
+  # geom_point(aes(index, lower_pred), color = "green") +
+  # geom_point(aes(index, upper_pred), color = "green") +
+  geom_smooth(aes(index, lower_conf)) +
+  geom_smooth(aes(index, upper_conf)) +
+  geom_smooth(aes(index, lower_pred)) +
+  geom_smooth(aes(index, upper_pred)) +
+  geom_smooth(aes(index, pred))
+  
 
 ```
-
-
-
-<!-- ```{r} -->
-
-
-<!-- plot_data <- data.frame(x = seq_along(EL_HOME$Kontantpris), p = exp(pred), k = -->
-<!--                           EL_HOME$Kontantpris) -->
-
-<!-- ggplot(plot_data, aes(x, k)) + -->
-<!--   geom_point(color = "red") + -->
-<!--   geom_point(aes(x, p), color = "blue") + -->
-<!--   theme_bw() + -->
-<!--   xlab("Index") + -->
-<!--   ylab("Pris") -->
-
-
-<!-- resid_plot <- data.frame(res = EL_HOME$Kontantpris - exp(pred), index = -->
-<!--                            seq_along(residuals(mod3))) -->
-
-<!-- ggplot(resid_plot, aes(index, res)) + -->
-<!--   geom_point() -->
-
-<!-- summary((residuals(mod3))) -->
-<!-- summary(EL_HOME$Kontantpris - exp(pred)) -->
-
-<!-- ``` -->
 
 
 
