@@ -1,0 +1,328 @@
+---
+title: "Data Analysis"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+\pagenumbering{gobble}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DT)
+library(GGally)
+library(caret) # for cross validation
+library(readr)
+library(dataMaid)
+library(corrplot)
+
+```
+
+```{r "data import", include=FALSE}
+load("C:/Users/rasmu/OneDrive - Aalborg Universitet/0P5/R-projekt-p5/HOME dataset updated/HOME_med_koordinater.Rda")
+#Tænker at man kan nøjes med at inkludere kode og plots ved brug af \includepdf i overleaf, altså ved at slette den smule lim tekst jeg skriver mellem code chunks og så knitte til pdf. Eller bare kopiere relevante chunks ind i andet dokument for at knitte.
+```
+
+
+```{r "data report dataMaid", eval=FALSE, include=FALSE}
+# makeDataReport(HOME)
+```
+
+
+```{r "fixing parameter classes"}
+EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
+  filter(Postnr == 9000) %>% 
+  select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
+            AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+
+EL_HOME$OmbygningSket <- factor(EL_HOME$OmbygningSket)
+EL_HOME$Hoejhus <- factor(EL_HOME$Hoejhus)
+EL_HOME$Storgrund <- factor(EL_HOME$Storgrund)
+EL_HOME$Kaelder <- factor(EL_HOME$Kaelder)
+EL_HOME$MangeToil <- factor(EL_HOME$MangeToil)
+EL_HOME$Salgsaar <- as.integer(EL_HOME$Salgsaar)
+EL_HOME$GarageCarport <- factor(EL_HOME$GarageCarport)
+EL_HOME$Altan <- factor(EL_HOME$Altan)
+EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
+EL_HOME$AntalPlan <- factor(EL_HOME$AntalPlan)
+EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
+EL_HOME$EjdType <- factor(EL_HOME$EjdType)
+EL_HOME$Liggetid <- as.integer(EL_HOME$Liggetid)
+```
+
+\newpage
+
+```{r "check normal distribution1"}
+qqnorm(EL_HOME$Kontantpris)
+qqline(EL_HOME$Kontantpris)
+```
+\newpage
+
+```{r "check normal distribution3"}
+qqnorm(log(EL_HOME$Kontantpris))
+qqline(log(EL_HOME$Kontantpris))
+```
+\newpage
+
+```{r "check normal distribution5"}
+ggplot(EL_HOME, aes(log(Kontantpris))) +
+  geom_density(size = 1.2) +
+  theme_bw()
+```
+\newpage
+
+```{r "check normal distribution6"}
+ggplot(EL_HOME, aes((Kontantpris))) +
+  geom_density(size = 1.2) +
+  theme_bw()
+```
+\newpage
+
+
+```{r "parameter for season"}
+EL_HOME$Season <- EL_HOME$Kvartal1 + EL_HOME$Kvartal2 * 2 + EL_HOME$Kvartal3 * 3 + 
+  EL_HOME$Kvartal4 *4
+EL_HOME$Season <- factor(EL_HOME$Season)
+
+EL_HOME <- EL_HOME %>% select(-c(Kvartal1, Kvartal2, Kvartal3, Kvartal4,
+                                 GarageCarport, x, y, long, lat, Hoejhus,
+                                 Storgrund, Kaelder, Kaelderareal, Grundareal,
+                                 AntalPlan))
+```
+
+
+```{r "initial model1"}
+mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
+           data = EL_HOME)
+```
+\newpage
+
+```{r "initial model2"}
+summary(mod1)
+```
+\newpage
+
+```{r "residuals and leverage1", warning=FALSE}
+res <- rstudent(mod1)
+pred <- predict(mod1)
+
+ggplot(cbind(EL_HOME, res, pred), aes(Kontantpris, res)) +
+  geom_point() +
+  theme_bw()
+```
+\newpage
+
+```{r "residuals and leverage2", warning=FALSE}
+ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
+  geom_point() +
+  theme_bw()
+```
+\newpage
+
+```{r "residuals and leverage3", warning=FALSE}
+res_large <- which(abs(res) > 4.5)
+EL_HOME[res_large,]
+```
+\newpage
+
+```{r "residuals and leverage3", warning=FALSE}
+hat <- data.frame(hatvalues(mod1))
+
+ggplot(hat, aes(hat$hatvalues.mod1.)) +
+  geom_histogram() +
+  theme_bw()
+```
+\newpage
+
+```{r "residuals and leverage4", warning=FALSE}
+hat_large <- which(hat > 0.2)
+EL_HOME[hat_large,]
+```
+\newpage
+
+```{r "residuals and leverage4", warning=FALSE}
+EL_HOME <- EL_HOME[-res_large,]
+EL_HOME <- EL_HOME[-hat_large,]
+```
+\newpage
+
+```{r "residuals and leverage5", warning=FALSE}
+summary(EL_HOME$Boligtilstand)
+```
+\newpage
+
+```{r "residuals and leverage6", warning=FALSE}
+EL_HOME <- EL_HOME[-which(EL_HOME$Boligtilstand == "Daarlig"),]
+EL_HOME$Boligtilstand <- factor(EL_HOME$Boligtilstand)
+```
+
+\newpage
+```{r "residuals and leverage7", warning=FALSE}
+summary(EL_HOME$AntalToiletter)
+```
+\newpage
+
+```{r "residuals and leverage8", warning=FALSE}
+EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
+```
+
+
+```{r "reducing parameters1", warning=FALSE}
+mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
+             data = EL_HOME)
+```
+
+\newpage
+```{r "reducing parameters2", warning=FALSE}
+summary(mod1)
+```
+
+\newpage
+```{r "reducing parameters3", warning=FALSE}
+mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
+             OmbygningSket + Opfoerelsesaar + Salgsaar, data = EL_HOME)
+```
+
+\newpage
+```{r "reducing parameters4", warning=FALSE}
+summary(mod2)
+anova(mod1,mod2)
+```
+\newpage
+
+```{r "reducing parameters5", warning=FALSE}
+mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstand +
+             Salgsaar, data = EL_HOME)
+```
+\newpage
+
+```{r "reducing parameters6", warning=FALSE}
+summary(mod3)
+anova(mod2,mod3)
+```
+\newpage
+
+```{r "reducing parameters7", warning=FALSE}
+mod4 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar, data = EL_HOME)
+```
+\newpage
+
+```{r "reducing parameters8", warning=FALSE}
+summary(mod4)
+anova(mod3,mod4)
+```
+\newpage
+
+```{r "reducing parameters9", warning=FALSE}
+mod5 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder, data = EL_HOME)
+```
+\newpage
+
+```{r "reducing parameters10", warning=FALSE}
+summary(mod5)
+anova(mod4,mod5)
+
+```
+\newpage
+
+
+```{r "residual and leverage check of mod51"}
+res <- rstudent(mod5)
+pred <- predict(mod5)
+
+ggplot(cbind(EL_HOME, res, pred), aes(log(Kontantpris), res)) +
+  geom_point() +
+  theme_bw()
+```
+\newpage
+
+```{r "residual and leverage check of mod52"}
+ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
+  geom_point() +
+  theme_bw()
+```
+\newpage
+
+```{r "residual and leverage check of mod53"}
+hat <- data.frame(hatvalues(mod5))
+
+ggplot(hat, aes(hat$hatvalues.mod5.)) +
+  geom_histogram() +
+  theme_bw()
+
+```
+\newpage
+
+
+```{r "cross validation k fold1"}
+train.control <- trainControl(method = "repeatedcv", 
+                              number = 5, repeats = 10)
+model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder, 
+               data = EL_HOME, method = "lm",
+               trControl = train.control)
+```
+
+\newpage
+```{r "cross validation k fold2"}
+model$finalModel
+mod5$coefficients
+model$results
+
+```
+\newpage
+
+```{r "cross validation leave one out1"}
+train.control <- trainControl(method = "LOOCV")
+model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
+             Salgsaar + Alder,
+                     data = EL_HOME, method = "lm",
+                     trControl = train.control)
+```
+
+\newpage
+```{r "cross validation leave one out2"}
+model_loocv$finalModel
+mod5$coefficients
+model_loocv$results
+```
+\newpage
+
+```{r}
+ordered_data <- arrange(EL_HOME, Kontantpris)
+
+yc <- as.data.frame(apply(predict(mod5, ordered_data, interval = "confidence"), 2, exp))
+names(yc) <- c("pred", "lower_conf", "upper_conf")
+ypi <- as.data.frame(apply(predict(mod5, ordered_data, interval = "prediction"),2,exp)) %>% 
+  select(-fit)
+names(ypi) <- c("lower_pred", "upper_pred")
+
+plot_data <- bind_cols(ordered_data, yc, ypi, index = seq_along(EL_HOME$Kontantpris))
+
+subset <- seq(1, length(EL_HOME$Kontantpris), length.out = 100)
+```
+\newpage
+
+```{r}
+ggplot(plot_data[,], aes(index, Kontantpris)) +
+  geom_point() +
+  geom_smooth(aes(index, lower_conf), color = "red") +
+  geom_smooth(aes(index, upper_conf), color = "red") +
+  geom_smooth(aes(index, lower_pred), color = "green") +
+  geom_smooth(aes(index, upper_pred), color = "green") +
+  geom_smooth(aes(index, pred), color = "blue") +
+  theme_bw()
+  
+
+```
+
+
+
+
+
+
