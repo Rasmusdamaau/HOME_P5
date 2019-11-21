@@ -121,13 +121,13 @@ ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
 ```
 \newpage
 
-```{r "residuals and leverage3", warning=FALSE}
+```{r "residuals and leverage3.1", warning=FALSE}
 res_large <- which(abs(res) > 4.5)
 EL_HOME[res_large,]
 ```
 \newpage
 
-```{r "residuals and leverage3", warning=FALSE}
+```{r "residuals and leverage3.2", warning=FALSE}
 hat <- data.frame(hatvalues(mod1))
 
 ggplot(hat, aes(hat$hatvalues.mod1.)) +
@@ -136,13 +136,13 @@ ggplot(hat, aes(hat$hatvalues.mod1.)) +
 ```
 \newpage
 
-```{r "residuals and leverage4", warning=FALSE}
+```{r "residuals and leverage4.1", warning=FALSE}
 hat_large <- which(hat > 0.2)
 EL_HOME[hat_large,]
 ```
 \newpage
 
-```{r "residuals and leverage4", warning=FALSE}
+```{r "residuals and leverage4.2", warning=FALSE}
 EL_HOME <- EL_HOME[-res_large,]
 EL_HOME <- EL_HOME[-hat_large,]
 ```
