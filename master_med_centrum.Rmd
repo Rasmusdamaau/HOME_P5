@@ -453,7 +453,22 @@ leaflet(HOME_center_aab) %>%
 ```
 
 
+```{r}
 
+X <- model.matrix(mod5)
+H <- X %*% solve(t(X) %*% X) %*% t(X)
+H_anden <- H %*% H
+norm(H - H_anden, "F")
+H_minus <- t(H) - H
+
+```
+
+```{r}
+pris_low <- EL_HOME$Kontantpris * 0.75
+pris_high <- EL_HOME$Kontantpris * 1.25
+sum(exp(pred) < pris_high & exp(pred) > pris_low) / length(EL_HOME$Kontantpris)
+
+```
 
 
 
