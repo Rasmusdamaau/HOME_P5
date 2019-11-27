@@ -1,5 +1,6 @@
 ---
 title: "Data analysis"
+always_allow_html: true
 output:
   pdf_document: default
   html_document:
@@ -17,6 +18,7 @@ library(caret) # for cross validation
 library(readr)
 library(dataMaid)
 library(corrplot)
+library(leaflet)
 ```
 
 ```{r "data import", include=FALSE}
@@ -33,7 +35,7 @@ Firstly dataMaid is used to get a generel feel for the data, this will not be in
 
 From the data report a number of issues are noticed with the classes of the parameters, such as parameters which should be integers and so on. Aswell as parameters with a lot of missing values.
 
-```{r "fixing parameter classes"}
+```{r "fixing parameter classes1"}
 # select only "ejerlejligheder" in "Aalborg" and
 # remove parameters with too many NA's, and removing rows with NA's
 
@@ -41,8 +43,18 @@ EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>%
   filter(Postnr == 9000) %>% 
   select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
             AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+```
+\newpage
 
+```{r "fixing parameter classes2"}
+pal <- colorQuantile("YlOrRd", NULL, n = 5)
+leaflet(EL_HOME) %>% 
+  addTiles() %>%
+  addCircleMarkers(color = ~pal(Kontantpris), radius = 1)
+```
+\newpage
 
+```{r "fixing parameter classes3"}
 EL_HOME$OmbygningSket <- factor(EL_HOME$OmbygningSket)
 EL_HOME$Hoejhus <- factor(EL_HOME$Hoejhus)
 EL_HOME$Storgrund <- factor(EL_HOME$Storgrund)
@@ -121,7 +133,8 @@ Firstly a model with all relevant parameters is tried. For example Alder is remo
 
 ```{r "initial model1"}
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season +
+             Fracentrum,
            data = EL_HOME)
 ```
 \newpage
@@ -193,7 +206,6 @@ summary(EL_HOME$AntalToiletter)
 
 ```{r "residuals and leverage8", warning=FALSE}
 EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
-
 ```
 
 # Reducing parameters
@@ -201,8 +213,9 @@ EL_HOME$AntalToiletter <- factor(EL_HOME$AntalToiletter)
 
 ```{r "reducing parameters1", warning=FALSE}
 mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
-             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season,
-             data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Liggetid + Salgsaar + Season + 
+             Fracentrum,
+           data = EL_HOME)
 ```
 
 \newpage
@@ -215,7 +228,8 @@ summary(mod1)
 # attempt at removal of insignificant parameters:
 # Season, Liggetid, Antal toiletter
 mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
-             OmbygningSket + Opfoerelsesaar + Salgsaar, data = EL_HOME)
+             OmbygningSket + Opfoerelsesaar + Salgsaar + Fracentrum,
+           data = EL_HOME)
 ```
 
 \newpage
@@ -234,7 +248,7 @@ anova(mod1,mod2)
 # attempt at removal of insignificant parameters:
 # OmbygningSket
 mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstand +
-             Salgsaar, data = EL_HOME)
+             Salgsaar + Fracentrum, data = EL_HOME)
 ```
 \newpage
 
@@ -253,7 +267,7 @@ anova(mod2,mod3)
 # attempt at removal of insignificant parameters:
 # Opfoerelsesaar
 mod4 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar, data = EL_HOME)
+             Salgsaar + Fracentrum, data = EL_HOME)
 ```
 \newpage
 
@@ -272,7 +286,7 @@ anova(mod3,mod4)
 
 ```{r "reducing parameters9", warning=FALSE}
 mod5 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar + Alder, data = EL_HOME)
+             Salgsaar + Alder + Fracentrum, data = EL_HOME)
 ```
 \newpage
 
@@ -331,7 +345,7 @@ train.control <- trainControl(method = "repeatedcv",
                               number = 5, repeats = 10)
 # Train the model
 model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar + Alder, 
+                 Salgsaar + Alder + Fracentrum, 
                data = EL_HOME, method = "lm",
                trControl = train.control)
 # Summarize the results
@@ -353,7 +367,7 @@ model$results
 train.control <- trainControl(method = "LOOCV")
 # Train the model
 model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar + Alder,
+                       Salgsaar + Alder + Fracentrum,
                      data = EL_HOME, method = "lm",
                      trControl = train.control)
 # Summarize the results
@@ -398,7 +412,7 @@ ggplot(plot_data[,], aes(index, Kontantpris)) +
   geom_smooth(aes(index, upper_pred), color = "green") +
   geom_smooth(aes(index, pred), color = "blue") +
   theme_bw()
-  
+
 
 ```
 \newpage
@@ -420,12 +434,28 @@ AIC(mod1)
 ```
 
 
+
 ```{r}
 
 centrum <- c(9.921747, 57.048820)
-data_m_centrum <- data.frame(long = EL_HOME$long - centrum[1], lat = EL_HOME$lat
+data_m_centrum <- data.frame(long = HOME$long - centrum[1], lat = HOME$lat
                              - centrum[2])
 length_centrum <- apply(data_m_centrum, 1, norm, type = "2")
+HOME$Fracentrum <- length_centrum
+
+HOME_center_aab <- HOME %>% filter(length_centrum < 0.2)
+pal <- colorQuantile("YlOrRd", NULL, n = 5)
+leaflet(HOME_center_aab) %>% 
+  addTiles() %>%
+  addCircleMarkers(color = ~pal(Kontantpris), radius = 1)
+
+
 ```
+
+
+
+
+
+
 
 
