@@ -75,15 +75,17 @@ EL_HOME$Liggetid <- as.integer(EL_HOME$Liggetid)
 Now the distribution of "Kontant pris" is checked, which should be normal for a GLM.
 
 ```{r "check normal distribution1"}
-qqnorm(EL_HOME$Kontantpris)
-qqline(EL_HOME$Kontantpris)
+ggplot(EL_HOME, aes(sample = Kontantpris)) +
+  stat_qq() +
+  stat_qq_line()
 ```
 \newpage
 
 ```{r "check normal distribution3"}
 # A logarithmic transformation is tried
-qqnorm(log(EL_HOME$Kontantpris))
-qqline(log(EL_HOME$Kontantpris))
+ggplot(EL_HOME, aes(sample = log(Kontantpris))) +
+  stat_qq() +
+  stat_qq_line()
 ```
 \newpage
 
@@ -278,37 +280,15 @@ summary(mod4)
 
 ```{r "reducing parameters8.2", warning=FALSE}
 anova(mod3,mod4)
-# the p-value says that Opfoerelsesaar can safely be removed
-# now only Salgsaar is a parameter so Alder can be added without 
-# causing linear dependency
+# the p-value says that Opfoerelsesaar can not be removed
 ```
 \newpage
 
-```{r "reducing parameters9", warning=FALSE}
-mod5 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-             Salgsaar + Alder + Fracentrum, data = EL_HOME)
-```
-\newpage
+# Check mod3
 
-```{r "reducing parameters10.1", warning=FALSE}
-summary(mod5)
-```
-\newpage
-
-```{r "reducing parameters10.2", warning=FALSE}
-anova(mod4,mod5)
-# the p-value shows that Alder can not be removed
-
-# the model can not be reduced to less than mod5
-
-```
-\newpage
-
-# Check mod5
-
-```{r "residual and leverage check of mod51"}
-res <- rstudent(mod5)
-pred <- predict(mod5)
+```{r "residual and leverage check of mod31"}
+res <- rstudent(mod3)
+pred <- predict(mod3)
 index <- seq_along(EL_HOME$Kontantpris)
 ```
 \newpage
@@ -321,17 +301,17 @@ ggplot(cbind(EL_HOME, res, pred, index), aes(index, res)) +
 \newpage
 
 
-```{r "residual and leverage check of mod52"}
+```{r "residual and leverage check of mod32"}
 ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
   geom_point() +
   theme_bw()
 ```
 \newpage
 
-```{r "residual and leverage check of mod53"}
-hat <- data.frame(hatvalues(mod5))
+```{r "residual and leverage check of mod33"}
+hat <- data.frame(hatvalues(mod3))
 
-ggplot(hat, aes(hat$hatvalues.mod5.)) +
+ggplot(hat, aes(hat$hatvalues.mod3.)) +
   geom_histogram() +
   theme_bw()
 
@@ -341,11 +321,11 @@ ggplot(hat, aes(hat$hatvalues.mod5.)) +
 # Cross validation K fold
 
 ```{r "cross validation k fold1"}
-train.control <- trainControl(method = "repeatedcv", 
-                              number = 5, repeats = 10)
+train.control <- trainControl(method = "cv", 
+                              number = 5)
 # Train the model
 model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-                 Salgsaar + Alder + Fracentrum, 
+                 Salgsaar + Opfoerelsesaar + Fracentrum, 
                data = EL_HOME, method = "lm",
                trControl = train.control)
 # Summarize the results
@@ -355,7 +335,7 @@ model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
 \newpage
 ```{r "cross validation k fold2"}
 model$finalModel
-mod5$coefficients
+mod3$coefficients
 model$results
 
 ```
@@ -367,7 +347,7 @@ model$results
 train.control <- trainControl(method = "LOOCV")
 # Train the model
 model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
-                       Salgsaar + Alder + Fracentrum,
+                       Salgsaar + Opfoerelsesaar + Fracentrum,
                      data = EL_HOME, method = "lm",
                      trControl = train.control)
 # Summarize the results
@@ -377,55 +357,20 @@ model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
 \newpage
 ```{r "cross validation leave one out2"}
 model_loocv$finalModel
-mod5$coefficients
+mod3$coefficients
 model_loocv$results
 
 ```
 \newpage
 
 ```{r}
-ordered_data <- arrange(EL_HOME, Kontantpris)
-
-yc <- as.data.frame(apply(predict(mod5, ordered_data, interval = "confidence"), 2, exp))
-names(yc) <- c("pred", "lower_conf", "upper_conf")
-ypi <- as.data.frame(apply(predict(mod5, ordered_data, interval = "prediction"),2,exp)) %>% 
-  select(-fit)
-names(ypi) <- c("lower_pred", "upper_pred")
-
-plot_data <- bind_cols(ordered_data, yc, ypi, index = seq_along(EL_HOME$Kontantpris))
-
-subset <- seq(1, length(EL_HOME$Kontantpris), length.out = 100)
-```
-\newpage
-
-```{r}
-ggplot(plot_data[,], aes(index, Kontantpris)) +
-  geom_point() +
-  # geom_point(aes(index, pred), color = "blue") +
-  # geom_point(aes(index, lower_conf), color = "red") +
-  # geom_point(aes(index, upper_conf), color = "red") +
-  # geom_point(aes(index, lower_pred), color = "green") +
-  # geom_point(aes(index, upper_pred), color = "green") +
-  geom_smooth(aes(index, lower_conf), color = "red") +
-  geom_smooth(aes(index, upper_conf), color = "red") +
-  geom_smooth(aes(index, lower_pred), color = "green") +
-  geom_smooth(aes(index, upper_pred), color = "green") +
-  geom_smooth(aes(index, pred), color = "blue") +
-  theme_bw()
-
-
-```
-\newpage
-
-```{r}
-anova(mod1,mod4)
+anova(mod1,mod3)
 ```
 
 ```{r}
 
 mod0 <- lm(log(Kontantpris) ~ Boligareal, data = EL_HOME)
 AIC(mod0)
-AIC(mod5)
 AIC(mod4)
 AIC(mod3)
 AIC(mod2)
@@ -435,7 +380,7 @@ AIC(mod1)
 
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 centrum <- c(9.921747, 57.048820)
 data_m_centrum <- data.frame(long = HOME$long - centrum[1], lat = HOME$lat
@@ -453,7 +398,7 @@ leaflet(HOME_center_aab) %>%
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 X <- model.matrix(mod5)
 H <- X %*% solve(t(X) %*% X) %*% t(X)
@@ -471,6 +416,80 @@ sum(exp(pred) < pris_high & exp(pred) > pris_low) / length(EL_HOME$Kontantpris)
 ```
 
 
+# Forward method
+
+
+```{r}
+
+mod0 <- lm(log(Kontantpris) ~ Boligareal, data = EL_HOME)
+summary(mod0)
+mod1 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar, data = EL_HOME)
+summary(mod1)
+mod2 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum, data = EL_HOME)
+summary(mod2)
+mod3 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder, data = EL_HOME)
+summary(mod3)
+mod4 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder + OmbygningSket, data = EL_HOME)
+summary(mod4)
+mod5 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder + OmbygningSket + Boligtilstand, data = EL_HOME)
+summary(mod5)
+mod6 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder + OmbygningSket + Boligtilstand + Altan, data = EL_HOME)
+summary(mod6)
+
+```
+
+```{r}
+trainIndex <- createDataPartition(EL_HOME$Kontantpris, p = .7, 
+                                  list = FALSE, 
+                                  times = 1)
+EL_HOME_TRAIN <- EL_HOME[trainIndex,]
+
+```
+
+
+
+```{r}
+train.control <- trainControl(method = "cv", 
+                              number = 5)
+# Train the model
+model <- train(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder + OmbygningSket + Boligtilstand + Altan, 
+               data = EL_HOME_TRAIN, method = "lm",
+               trControl = train.control)
+
+model$finalModel
+mod6$coefficients
+model$results
+```
+
+```{r}
+train.control <- trainControl(method = "LOOCV")
+# Train the model
+model_loocv <- train(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
+             Alder + OmbygningSket + Boligtilstand + Altan,
+                     data = EL_HOME_TRAIN, method = "lm",
+                     trControl = train.control)
+
+model_loocv$finalModel
+mod6$coefficients
+model_loocv$results
+```
+
+
+```{r}
+
+mean(exp(predict(mod3)) - EL_HOME$Kontantpris)
+mean(exp(predict(mod6)) - EL_HOME$Kontantpris)
+
+mean(exp(predict(model, EL_HOME)) - EL_HOME$Kontantpris)
+mean(exp(predict(model_loocv, EL_HOME)) - EL_HOME$Kontantpris)
+
+
+```
 
 
 
