@@ -5,6 +5,8 @@ output:
   pdf_document: default
   html_document:
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 \pagenumbering{gobble}
 
@@ -19,6 +21,7 @@ library(readr)
 library(dataMaid)
 library(corrplot)
 library(leaflet)
+library(grid)
 ```
 
 ```{r "data import", include=FALSE}
@@ -223,6 +226,8 @@ mod1 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan
 \newpage
 ```{r "reducing parameters2", warning=FALSE}
 summary(mod1)
+
+AIC(mod1)
 ```
 
 \newpage
@@ -237,6 +242,8 @@ mod2 <- lm(log(Kontantpris) ~ Boligtilstand + Boligareal + Altan +
 \newpage
 ```{r "reducing parameters4.1", warning=FALSE}
 summary(mod2)
+
+AIC(mod2)
 ```
 \newpage
 
@@ -256,6 +263,11 @@ mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstan
 
 ```{r "reducing parameters6.1", warning=FALSE}
 summary(mod3)
+
+AIC(mod3)
+
+#RMSE
+sqrt(mean(residuals(mod3)^2))
 ```
 \newpage
 
@@ -275,6 +287,8 @@ mod4 <- lm(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
 
 ```{r "reducing parameters8.1", warning=FALSE}
 summary(mod4)
+
+AIC(mod4)
 ```
 \newpage
 
@@ -330,12 +344,16 @@ model <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
                trControl = train.control)
 # Summarize the results
 # print(model)
+
+model
+
 ```
 
 \newpage
 ```{r "cross validation k fold2"}
-model$finalModel
+AIC(model$finalModel)
 mod3$coefficients
+model$finalModel
 model$results
 
 ```
@@ -352,12 +370,16 @@ model_loocv <- train(log(Kontantpris) ~ Boligareal + Altan + Boligtilstand +
                      trControl = train.control)
 # Summarize the results
 # print(model_loocv)
+
+
+model_loocv
 ```
 
 \newpage
 ```{r "cross validation leave one out2"}
-model_loocv$finalModel
+AIC(model_loocv$finalModel)
 mod3$coefficients
+model_loocv$finalModel
 model_loocv$results
 
 ```
@@ -367,7 +389,7 @@ model_loocv$results
 anova(mod1,mod3)
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 mod0 <- lm(log(Kontantpris) ~ Boligareal, data = EL_HOME)
 AIC(mod0)
@@ -409,18 +431,18 @@ H_minus <- t(H) - H
 ```
 
 ```{r}
-pris_low <- EL_HOME$Kontantpris * 0.75
-pris_high <- EL_HOME$Kontantpris * 1.25
+pris_low <- EL_HOME$Kontantpris * 0.8
+pris_high <- EL_HOME$Kontantpris * 1.2
 sum(exp(pred) < pris_high & exp(pred) > pris_low) / length(EL_HOME$Kontantpris)
 
 ```
 
 
+
 # Forward method
 
 
-```{r}
-
+```{r include=FALSE}
 mod0 <- lm(log(Kontantpris) ~ Boligareal, data = EL_HOME)
 summary(mod0)
 mod1 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar, data = EL_HOME)
@@ -436,11 +458,24 @@ summary(mod4)
 mod5 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
              Alder + OmbygningSket + Boligtilstand, data = EL_HOME)
 summary(mod5)
+
 mod6 <- lm(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
              Alder + OmbygningSket + Boligtilstand + Altan, data = EL_HOME)
+```
+
+\newpage
+```{r}
 summary(mod6)
 
+AIC(mod6)
+
+#RMSE
+sqrt(mean(residuals(mod6)^2))
 ```
+
+
+\newpage
+
 
 ```{r}
 trainIndex <- createDataPartition(EL_HOME$Kontantpris, p = .7, 
@@ -458,37 +493,192 @@ train.control <- trainControl(method = "cv",
 # Train the model
 model <- train(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
              Alder + OmbygningSket + Boligtilstand + Altan, 
-               data = EL_HOME_TRAIN, method = "lm",
+               data = EL_HOME, method = "lm",
                trControl = train.control)
 
-model$finalModel
+model
+```
+
+\newpage
+
+```{r}
+AIC(model$finalModel)
 mod6$coefficients
+model$finalModel
 model$results
 ```
+
+\newpage
 
 ```{r}
 train.control <- trainControl(method = "LOOCV")
 # Train the model
 model_loocv <- train(log(Kontantpris) ~ Boligareal + Salgsaar + Fracentrum + 
              Alder + OmbygningSket + Boligtilstand + Altan,
-                     data = EL_HOME_TRAIN, method = "lm",
+                     data = EL_HOME, method = "lm",
                      trControl = train.control)
 
-model_loocv$finalModel
+model_loocv
+```
+\newpage
+
+```{r}
+AIC(model_loocv$finalModel)
 mod6$coefficients
+model_loocv$finalModel
 model_loocv$results
+```
+\newpage
+
+```{r}
+# mod3 <- lm(log(Kontantpris) ~ Boligareal + Altan + Opfoerelsesaar + Boligtilstand +
+#              Salgsaar + Fracentrum, data = EL_HOME)
+# 
+# mean(exp(predict(mod3)) - EL_HOME$Kontantpris)
+# mean(exp(predict(mod6)) - EL_HOME$Kontantpris)
+# 
+# mean(exp(predict(model, EL_HOME[-trainIndex,])) - EL_HOME[-trainIndex,]$Kontantpris)
+# mean(exp(predict(model_loocv, EL_HOME[-trainIndex,])) -
+#        EL_HOME$Kontantpris[-trainIndex])
+# mean(exp(predict(model, EL_HOME[trainIndex,])) - EL_HOME[trainIndex,]$Kontantpris)
+# mean(exp(predict(model_loocv, EL_HOME[trainIndex,])) -
+#        EL_HOME$Kontantpris[trainIndex])
+# 
+# summary(mod3)["adj.r.squared"]
+# summary(mod6)["adj.r.squared"]
+
+
 ```
 
 
 ```{r}
 
-mean(exp(predict(mod3)) - EL_HOME$Kontantpris)
-mean(exp(predict(mod6)) - EL_HOME$Kontantpris)
+res <- rstudent(mod6)
+pred <- predict(mod6)
+index <- seq_along(EL_HOME$Kontantpris)
+```
+\newpage
 
-mean(exp(predict(model, EL_HOME)) - EL_HOME$Kontantpris)
-mean(exp(predict(model_loocv, EL_HOME)) - EL_HOME$Kontantpris)
+```{r}
+ggplot(cbind(EL_HOME, res, pred, index), aes(index, res)) +
+  geom_point() +
+  theme_bw()
+```
+\newpage
 
 
+```{r "residual and leverage check of mod321"}
+ggplot(cbind(EL_HOME, res, pred), aes(pred, res)) +
+  geom_point() +
+  theme_bw()
+
+
+```
+
+
+
+```{r}
+
+a <- ggplot(cbind(EL_HOME, res, pred), aes(Boligareal, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+```
+
+```{r}
+
+b <- ggplot(cbind(EL_HOME, res, pred), aes(Salgsaar, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+
+```
+
+
+```{r}
+
+c <- ggplot(cbind(EL_HOME, res, pred), aes(Fracentrum, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+
+```
+
+```{r}
+
+d <- ggplot(cbind(EL_HOME, res, pred), aes(Alder, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+```
+
+
+```{r}
+
+e <- ggplot(cbind(EL_HOME, res, pred), aes(OmbygningSket, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+```
+
+```{r}
+
+f <- ggplot(cbind(EL_HOME, res, pred), aes(Boligtilstand, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+
+```
+
+```{r}
+g <- ggplot(cbind(EL_HOME, res, pred), aes(Altan, res)) +
+  geom_point() +
+  theme_bw(base_size = 15)
+```
+
+```{r "multiplot function", include=FALSE}
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  require(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+```
+
+
+```{r}
+
+layout <- matrix(c(1,2,5,3,4,8,6,7),4,2,byrow=TRUE)
+multiplot(g, b, c, d, e, f, a, cols = 2)
 ```
 
 
