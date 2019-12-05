@@ -36,6 +36,17 @@ Firstly dataMaid is used to get a generel feel for the data, this will not be in
 # makeDataReport(HOME)
 ```
 
+```{r}
+
+FULL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
+  select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
+            AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+
+
+
+```
+
+
 From the data report a number of issues are noticed with the classes of the parameters, such as parameters which should be integers and so on. Aswell as parameters with a lot of missing values.
 
 ```{r "fixing parameter classes1"}
@@ -266,6 +277,8 @@ summary(mod3)
 
 AIC(mod3)
 
+sqrt(mean((exp(predict(mod3)) - EL_HOME$Kontantpris)^2))
+
 #RMSE
 sqrt(mean(residuals(mod3)^2))
 ```
@@ -469,6 +482,8 @@ summary(mod6)
 
 AIC(mod6)
 
+sqrt(mean((exp(predict(mod6)) - EL_HOME$Kontantpris)^2))
+
 #RMSE
 sqrt(mean(residuals(mod6)^2))
 ```
@@ -507,6 +522,8 @@ mod6$coefficients
 model$finalModel
 model$results
 ```
+
+
 
 \newpage
 
@@ -557,6 +574,14 @@ res <- rstudent(mod6)
 pred <- predict(mod6)
 index <- seq_along(EL_HOME$Kontantpris)
 ```
+\newpage
+
+```{r}
+pris_low <- EL_HOME$Kontantpris * 0.8
+pris_high <- EL_HOME$Kontantpris * 1.2
+sum(exp(pred) < pris_high & exp(pred) > pris_low) / length(EL_HOME$Kontantpris)
+```
+
 \newpage
 
 ```{r}
@@ -681,5 +706,58 @@ layout <- matrix(c(1,2,5,3,4,8,6,7),4,2,byrow=TRUE)
 multiplot(g, b, c, d, e, f, a, cols = 2)
 ```
 
+```{r}
 
+anova(mod6)
+summary(mod6)
 
+```
+
+```{r}
+
+anova(mod1)
+
+mod2 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Opfoerelsesaar + Salgsaar + Season + 
+             Fracentrum,
+           data = EL_HOME)
+
+anova(mod2)
+
+mod3 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Opfoerelsesaar + Salgsaar + 
+             Fracentrum,
+           data = EL_HOME)
+anova(mod3)
+summary()
+
+mod4 <- lm(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter + Altan +
+             OmbygningSket + Salgsaar + Fracentrum + Alder,
+           data = EL_HOME)
+anova(mod4)
+
+summary(mod4)
+
+train.control <- trainControl(method = "LOOCV")
+# Train the model
+model_loocv <- train(log(Kontantpris) ~ Boligtilstand +Boligareal + AntalToiletter +
+                       Altan + OmbygningSket + Salgsaar + Fracentrum + Alder,
+                     data = EL_HOME, method = "lm",
+                     trControl = train.control)
+
+model_loocv
+
+```
+
+```{r}
+EL_HOME[1,]
+nyt <- EL_HOME[1,]
+nyt$Boligareal <- nyt$Boligareal +1
+coefficients(mod6)
+
+exp(predict(mod6, nyt)) - exp(predict(mod6, EL_HOME[1,]))
+
+nyt2 <- EL_HOME[2,]; nyt2$Boligareal <- nyt2$Boligareal +1
+exp(predict(mod6, nyt2)) - exp(predict(mod6, EL_HOME[2,]))
+
+```
