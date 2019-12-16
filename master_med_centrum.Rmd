@@ -43,6 +43,21 @@ FULL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>%
             AntalSovevaerelser, TaetVedVand)) %>% na.omit()
 
 
+sd(FULL_HOME$Kontantpris)
+
+ggplot(FULL_HOME, aes(sample = Kontantpris)) +
+  stat_qq() +
+  stat_qq_line()
+
+ggplot(FULL_HOME, aes(sample = log(Kontantpris))) +
+  stat_qq() +
+  stat_qq_line()
+
+ggplot(FULL_HOME, aes(Boligareal, (Kontantpris))) +
+  geom_point()
+
+
+
 
 ```
 
@@ -55,6 +70,10 @@ From the data report a number of issues are noticed with the classes of the para
 
 EL_HOME <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
   filter(Postnr == 9000) %>% 
+  select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
+            AntalSovevaerelser, TaetVedVand)) %>% na.omit()
+
+post_home <- HOME %>% filter(EjdType == "Ejerlejlighed") %>% 
   select(-c(NytKokken, NyeVinduer, NytBadevaerelse, 
             AntalSovevaerelser, TaetVedVand)) %>% na.omit()
 ```
@@ -141,6 +160,7 @@ EL_HOME <- EL_HOME %>% select(-c(Kvartal1, Kvartal2, Kvartal3, Kvartal4,
                                  Storgrund, Kaelder, Kaelderareal, Grundareal,
                                  AntalPlan))
 
+# EL_HOME$Alder <- EL_HOME$Salgsaar - EL_HOME$Opfoerelsesaar
 ```
 
 # Generel Linear model
@@ -317,6 +337,16 @@ anova(mod3,mod4)
 res <- rstudent(mod3)
 pred <- predict(mod3)
 index <- seq_along(EL_HOME$Kontantpris)
+res_std <- rstandard(mod3)
+```
+\newpage
+
+```{r}
+
+ggplot(as.data.frame(res_std), aes(sample = res_std)) +
+  stat_qq() +
+  stat_qq_line()
+
 ```
 \newpage
 
@@ -573,8 +603,18 @@ model_loocv$results
 res <- rstudent(mod6)
 pred <- predict(mod6)
 index <- seq_along(EL_HOME$Kontantpris)
+res_std <- rstandard(mod6)
 ```
 \newpage
+
+```{r}
+ggplot(as.data.frame(res_std), aes(sample = res_std)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+\newpage
+
 
 ```{r}
 pris_low <- EL_HOME$Kontantpris * 0.8
@@ -761,3 +801,152 @@ nyt2 <- EL_HOME[2,]; nyt2$Boligareal <- nyt2$Boligareal +1
 exp(predict(mod6, nyt2)) - exp(predict(mod6, EL_HOME[2,]))
 
 ```
+
+
+
+```{r}
+
+
+KBH_HOME <- FULL_HOME %>% filter(Postnr==1300)
+KBH_HOME$OmbygningSket <- factor(KBH_HOME$OmbygningSket)
+KBH_HOME$Hoejhus <- factor(KBH_HOME$Hoejhus)
+KBH_HOME$Storgrund <- factor(KBH_HOME$Storgrund)
+KBH_HOME$Kaelder <- factor(KBH_HOME$Kaelder)
+KBH_HOME$MangeToil <- factor(KBH_HOME$MangeToil)
+KBH_HOME$Salgsaar <- as.integer(KBH_HOME$Salgsaar)
+KBH_HOME$GarageCarport <- factor(KBH_HOME$GarageCarport)
+KBH_HOME$Altan <- factor(KBH_HOME$Altan)
+KBH_HOME$AntalToiletter <- factor(KBH_HOME$AntalToiletter)
+KBH_HOME$AntalPlan <- factor(KBH_HOME$AntalPlan)
+KBH_HOME$Boligtilstand <- factor(KBH_HOME$Boligtilstand)
+KBH_HOME$EjdType <- factor(KBH_HOME$EjdType)
+KBH_HOME$Liggetid <- as.integer(KBH_HOME$Liggetid)
+centrum <- c(9.921747, 57.048820)
+data_m_centrum <- data.frame(long = KBH_HOME$long - centrum[1], lat = KBH_HOME$lat
+                             - centrum[2])
+length_centrum <- apply(data_m_centrum, 1, norm, type = "2")
+KBH_HOME$Fracentrum <- length_centrum
+KBH_HOME$Fracentrum <- rep(0,6)
+exp(predict(mod6, KBH_HOME)) - KBH_HOME$Kontantpris
+
+
+
+```
+
+
+
+```{r}
+
+ggplot(EL_HOME, aes(OmbygningSket, Alder)) +
+  geom_violin()
+
+nu <- which(EL_HOME$Alder==0 & EL_HOME$OmbygningSket==1)
+
+EL_HOME[nu,]
+
+```
+
+
+```{r}
+res <- data.frame(res = rstudent(mod6))
+ggplot(res, aes(sample = res)) +
+  stat_qq(distribution = stats::qt, dparams = 1343-6) +
+  stat_qq_line(distribution = stats::qt, dparams = 1343-6)
+
+qqplot.t(as.data.frame(rstudent(mod6)))
+TDist
+qt()
+
+
+
+```
+
+
+
+```{r}
+
+postnr <- c(9600,9800,9830,9670,9574,9520,9340,9430,9520)
+tjek_postnr <- postnr %in% post_home$Postnr
+postnr <- postnr[tjek_postnr]
+# post_home_filter <- post_home %>% filter(Postnr == postnr[1] | Postnr == postnr[2]|
+#                                            Postnr == postnr[3]| Postnr == postnr[4])
+post_home_filter <- post_home %>% filter(Postnr %in% postnr)
+
+mean(post_home_filter$Kontantpris / post_home_filter$Boligareal)
+sd(post_home_filter$Kontantpris / post_home_filter$Boligareal)
+mean(EL_HOME$Kontantpris / EL_HOME$Boligareal)
+sd(EL_HOME$Kontantpris / EL_HOME$Boligareal)
+
+
+udkant_home <- post_home %>% group_by(Postnr)
+
+udkant_postnr <- filter(count(udkant_home,Postnr), n < 10)
+udkant_home_filter <- post_home %>% filter(Postnr %in% udkant_postnr$Postnr)
+mean(udkant_home_filter$Kontantpris / udkant_home_filter$Boligareal)
+sd(udkant_home_filter$Kontantpris / udkant_home_filter$Boligareal)
+
+```
+
+```{r}
+
+
+a <- ggplot(EL_HOME, aes(Boligareal, Kontantpris)) +
+  geom_point() +
+  theme_bw()
+b <- ggplot(EL_HOME, aes(Altan, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+c <- ggplot(EL_HOME, aes(Opfoerelsesaar, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+d <- ggplot(EL_HOME, aes(Boligtilstand, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+e <- ggplot(EL_HOME, aes(Salgsaar, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+f <- ggplot(EL_HOME, aes(Fracentrum, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+g <- ggplot(EL_HOME, aes(OmbygningSket, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+h <- ggplot(EL_HOME, aes(Alder, Kontantpris)) +
+  geom_point()+
+  theme_bw()
+
+multiplot(a,b,c,d,e,f,g,h, cols = 2)
+
+
+a <- ggplot(EL_HOME, aes(Boligareal, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+b <- ggplot(EL_HOME, aes(Altan, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+c <- ggplot(EL_HOME, aes(Opfoerelsesaar, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+d <- ggplot(EL_HOME, aes(Boligtilstand, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+e <- ggplot(EL_HOME, aes(Salgsaar, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+f <- ggplot(EL_HOME, aes(Fracentrum, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+g <- ggplot(EL_HOME, aes(OmbygningSket, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+h <- ggplot(EL_HOME, aes(Alder, log(Kontantpris))) +
+  geom_point()+
+  theme_bw()
+
+multiplot(a,b,c,d,e,f,g,h, cols = 2)
+```
+
+
+
+
+
